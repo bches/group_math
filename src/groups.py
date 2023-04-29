@@ -1,18 +1,82 @@
 from itertools import product
 from math import fabs
+import array
 
+class incremental_set:
+    '''The incremental set is an ordered set of consecutive integers 
+    for which the unary operations, increment and decrement, are defined.
+    Incrementing past the largest number of the set results in the smallest 
+    number in the set. Similarly, decrementing below the smallest number 
+    in the set results in the largest number in the set.'''
+    def __init__(self, m, n):
+        '''The incremental set has the following symmetry options:
+        m = 1: gives the symmetric group under composition, Sn.
+        m = -n: the members are symmetric about 0.
+        m = 0: no interesting symmetry in the members'''
+        assert m < n, "m must be less than n"
+        self.members = array.array("i", range(m,n+1))
+        self.index = 0
+        self.direction = True
+
+    def __repr__(self) -> str:
+        s = "<Instance of %s at addr %s:\n" % (self.__class__.__name__, id(self))
+        s += "\tindex = %s,\n" % self.index
+        s += "\tmembers = %s>" % self.members
+        return s
+
+    def reset(self, member):
+        assert member in self.members, "%s not in %s" % (member, self.members)
+        self.index = self.members.index(member)
+
+    def set_direction(self, direction):
+        '''direction = True : increment
+        direction = False : decrement'''
+        assert type(direction) is bool, "direction must be type bool (got %s)" % type(direction)
+        self.direction = direction
+
+    def __len__(self):
+        return len(self.members)
+        
+    def __next__(self):
+        if self.direction:
+            if self.index == (len(self)-1):
+                self.index = 0
+            else:
+                self.index += 1
+        else:
+            if self.index == 0:
+                self.index = len(self)-1
+            else:
+                self.index -= 1
+        return self.members[self.index]
+
+    def __iter__(self):
+        return self
+
+    def __call__(self, repeat):
+        if repeat > 0:
+            self.set_direction(True)
+            [next(self) for i in range(repeat)]
+        elif repeat < 0:
+            self.set_direction(False)
+            [next(self) for i in range(-repeat)]            
+        return self.members[self.index] 
+    
+        
 class group:
-    def __init__(self, base, members):
-        assert base != 0, "Base cannot be 0"
-        assert type(base) is int, "base must be an int"
-        self.base = base
-        assert type(members) is list, "members must be a list"
-        self.members = members
+    def __init__(self, subop):
+        self.subop = subop
+        self.members = subop.members
+        self.inverse = []
+        self.identity = None
+        self.generator = None
         
     def __repr__(self) -> str:
         s = "<Instance of %s at addr %s:\n" % (self.__class__.__name__, id(self))
-        s += "\tfor which operations are defined modulo %d,\n" % self.base
+        s += "\tidentity = %s,\n" % self.identity
         s += "\tmembers = %s,\n" % self.members
+        s += "\tinverse = %s,\n" % self.inverse
+        s += "\tsubop = %s,\n" % self.subop
         s += "\tisBijective: %s>\n" % self.isBijective()
         return s
 
@@ -27,220 +91,77 @@ class group:
         return self.__dict__ == other.__dict__
 
     def isBijective(self):
-        return False
+        return sum([self.inverse.count(each) for each in self.inverse]) == len(self.inverse) and None not in self.inverse
+
+    def reset(self, member):
+        assert member in self.members, "%s not in %s" % (member, self.members)
+        self.generator = member
 
         
-class incremental_set(group):
-    def __init__(self, base, symmetry=False):
-        assert base != 0, "Base cannot be 0"
-        assert type(base) is int, "base must be an int"
-        self.base = base
-        if base > 0:
-            b = base
-        else:
-            b = -base
-        if ( ( b % 2 ) == 1 ) and symmetry:
-            members = list(range(b//2+1))
-            self.members = [-member for member in members[-1:0:-1]] + members 
-        else:
-            self.members = list(range(b))
-        self.analysis = [self.members[-1]] + self.members[:-1]
-        self.synthesis = self.members[1:] + [self.members[0]]
-
-    def __repr__(self) -> str:
-        s = "<Instance of %s at addr %s:\n" % (self.__class__.__name__, id(self))
-        s += "\tfor which operations are defined modulo %d,\n" % self.base
-        s += "\tmembers = %s,\n" % self.members
-        s += "\tsynthesis = %s,\n" % self.synthesis
-        s += "\tanalysis = %s>" % self.analysis
-        return s
-
-    def synthesize(self, member) -> int:
-        return self.synthesis[self.members.index(member)]
-
-    def analyze(self, member) -> int:
-        return self.analysis[self.members.index(member)]
-
-    def isBijective(self):
-        return True
-    
-    
 class additive_group(group):
     def __init__(self, inc_grp):
         self.subop = inc_grp
         self.members = self.subop.members
-        self.base = self.subop.base
         self.identity = 0
         self.inverse = self.members[:]
         self.inverse.reverse()
         
-    def __repr__(self) -> str:
-        s = "<Instance of %s at addr %s:\n" % (self.__class__.__name__, id(self))
-        s += "\tfor which operations are defined modulo %d,\n" % self.base
-        s += "\tidentity = %s,\n" % self.identity
-        s += "\tmembers = %s,\n" % self.members
-        s += "\tinverse = %s>" % self.inverse
-        return s
-
     def synthesize(self, *members) -> int:
-        z = self.identity
-        for each in members:
-            if each > self.identity:
-                for i in range(each):
-                    z = self.subop.synthesize(z)
-            elif each < self.identity:
-                for i in range(-each):
-                    z = self.subop.analyze(z)                
-        return z
-
-    def analyze(self, *members) -> int:
-        z = self.identity
-        for each in members:
-            if each > self.identity:
-                for i in range(each):
-                    z = self.subop.analyze(z)
-            elif each < self.identity:
-                for i in range(-each):
-                    z = self.subop.synthesize(z)                
-        return z
+        self.subop.reset(self.identity)
+        z = [self.subop(repeat=member) for member in members]
+        return z[-1]
 
     def invert(self, member) -> int:
         result = self.inverse[self.members.index(member)]
         assert result is not None, "Inverse for %s does not exist in %s" % (member, self.__class__.__name__)
         return result
 
-    def isBijective(self):
-        return sum([self.inverse.count(each) for each in self.inverse]) == len(self.inverse) and None not in self.inverse
-    
+    def __call__(self, repeat):
+        if repeat > self.identity:
+            args = [self.generator] * repeat
+            self.generator =  self.synthesize(*args)
+            return self.generator
+        elif repeat < self.identity:
+            args = [-self.generator] * (-repeat)
+            self.generator =  self.synthesize(*args)
+            return self.generator
+        else:
+            return self.generator
+
     
 class multiplicative_group(additive_group):
     def __init__(self, add_grp):
         self.subop = add_grp
         self.members = self.subop.members
-        self.base = self.subop.base
         self.identity = 1
         self.inverse = [None] * len(self)
-        m = max(self.members)
-        for x in self.members:
-            if x in self.inverse or x == 0:
-                continue
-            if x == 1:
-                self.inverse[self.members.index(x)] = 1
-                continue
-            if x == -1:
-                self.inverse[self.members.index(x)] = -1
-                continue
-            for y in self.members:
-                if y in self.inverse or fabs(x*y) < m or y < x:
-                    continue                
-                if self.synthesize(x, y) == self.identity:
-                    self.inverse[self.members.index(x)] = y
-                    self.inverse[self.members.index(y)] = x
-                    break
 
     def synthesize(self, *members) -> int:
         if self.subop.identity in members:
             return self.subop.identity
-        z = self.identity
-        for each in members:
-            if each == -self.identity:
-                z = -z
-            elif each > self.identity:
-                z = self.subop.synthesize(*[z]*each)
-            elif each < -self.identity:
-                z = self.subop.analyze(*[z]*(-each))                
-        return z
-
-    def analyze(self, *members) -> int:
-        assert self.subop.identity not in members, "%s.analyze() by %s not allowed" % (self.__class__.__name__,
-                                                                                       self.subop.identity)
-        z = self.identity
-        for each in members:
-            if each == -self.identity:
-                z = -z
-            elif each > self.identity:
-                z = self.subop.analyze(*[z]*each)
-            elif each < -self.identity:
-                z = self.subop.synthesize(*[z]*(-each))                
-        return z
+        self.subop.reset(self.identity)
+        return [self.subop(repeat=member) for member in members][-1]
 
 
-class exponential_group(incremental_set):
-    def __init__(self, mul_grp):
-        self.subop = mul_grp
-        self.members = self.subop.members
-        self.base = self.subop.base
-        self.synthesis = {}
-        for member in self.members:
-            if member == 0 or member == 1:
-                self.synthesis[str(member)] = member
-            else:
-                self.synthesis[str(member)] = [self.subop.invert(self.subop.synthesize(*[member]*(-each))) for each in self.members if each < 0]
-                self.synthesis[str(member)] += [self.subop.synthesize(*[member]*each) for each in self.members if each >= 0]
-        self.analysis = {}
-        for member in self.members:
-            if member == 0 or member == 1:
-                self.analysis[str(member)] = None
-            else:
-                self.analysis[str(member)] = []
-                for each in self.members:
-                    n = self.synthesis[str(member)].count(each)
-                    if n == 0:
-                        self.analysis[str(member)] += [None]
-                    elif n == 1:
-                        index = self.synthesis[str(member)].index(each)
-                        self.analysis[str(member)] += [self.members[index]]
-                    else:
-                        indices = [i for i,x in enumerate(self.synthesis[str(member)]) if x == each]
-                        self.analysis[str(member)] += [tuple([self.members[j] for j in indices])]
-        self.identity = None
-        self.generator = None
-
-    def set_generator(self, member):
-        assert member not in [0,1], "Cannot set generator to 1 or 0 in %s" % self.__class__.__name__
-        self.generator = member
-        
-    def synthesize(self, member) -> int:
-        assert self.generator != None, "Cannot call %s.synthesize() with generator=None; first call %s.set_generator()" % self.__class__.__name__
-        return self.synthesis[str(self.generator)][self.members.index(member)]
-
-    def analyze(self, member) -> int:
-        assert self.generator != None, "Cannot call %s.analyze() with generator=None; first call %s.set_generator()" % self.__class__.__name__
-        return self.analysis[str(self.generator)][self.members.index(member)]
-
-    def isBijective(self):
-        return False
 
     
 # some groups are pre-defined for convenience    
-binary_group = {'mul':multiplicative_group(additive_group(incremental_set(base=2))),
-                'add':additive_group(incremental_set(base=2))}
-
-ternary_group = {'exp':exponential_group(multiplicative_group(additive_group(incremental_set(base=-3, symmetry=True)))),
-                 'mul':multiplicative_group(additive_group(incremental_set(base=-3, symmetry=True))),
-                 'add':additive_group(incremental_set(base=-3, symmetry=True))}
-
-pentary_group = {'exp':exponential_group(multiplicative_group(additive_group(incremental_set(base=-5, symmetry=True)))),
-                 'mul':multiplicative_group(additive_group(incremental_set(base=-5, symmetry=True))),
-                 'add':additive_group(incremental_set(base=-5, symmetry=True))}
-
-septary_group = {'exp':exponential_group(multiplicative_group(additive_group(incremental_set(base=7)))),
-                 'mul':multiplicative_group(additive_group(incremental_set(base=7))),
-                 'add':additive_group(incremental_set(base=7))}
+binary_group = {'mul':multiplicative_group(additive_group(incremental_set(0,1))),
+                'add':additive_group(incremental_set(0,1))}
 
 
 if __name__ == '__main__':
     print("Instantiate the incremental group")
-    b = incremental_set(base=2)
+    b = incremental_set(0,1)
     print(b)
     print()
-    t = incremental_set(base=-3, symmetry=True)
+    t = incremental_set(-1,1)
     print(t)
     print()
-    f = incremental_set(base=5, symmetry=True)
+    f = incremental_set(-2,2)
     print(f)
     print()
-    print("f.synthesize(member=1) =", f.synthesize(member=1))
+    print('Increment from -2 twice:', [next(f) for i in range(2)])
 
     print("\nInstantiate the additive group")
     g = additive_group(f)
@@ -249,6 +170,8 @@ if __name__ == '__main__':
     
     print("g.synthesize(1,2)=", g.synthesize(1,2))
     print("g.synthesize(2,2)=", g.synthesize(2,2))
+    print("f(-2):", f(-2))
+    print("g.synthesize(-2,-2)=", g.synthesize(-2,-2))
     print()
 
     print("Testing the 5-ary +ve group synthesis for all the combinations (of 2):")
@@ -261,16 +184,22 @@ if __name__ == '__main__':
         print("%s - %s = %s" % (x, y, g.synthesize(x, g.invert(y))))
     print()
 
-    
     print("Instantiate the multiplicative group")
     h = multiplicative_group(g)
     print("h=",h)
     print()
 
+    print("h.synthesize(2,2)=", h.synthesize(2,2))
+    print("h.synthesize(-2,2)=", h.synthesize(-2,2))
+    print("h.synthesize(2,-2)=", h.synthesize(2,-2))
+    print("h.synthesize(-2,-2)=", h.synthesize(-2,-2))
+
     print("Testing the 5-ary *ve group synthesis for all the combinations (of 2):")
     for x, y in product(h, repeat=2):
         print("%s * %s = %s" % (x, y, h.synthesize(x,y)))
     print()
+
+    assert False, "stop here"
 
     print("Testing the 5-ary *ve group analysis for all the combinations (of 2):")
     for x, y in product(h, repeat=2):
@@ -281,7 +210,6 @@ if __name__ == '__main__':
             continue
         print("%s / %s = %s" % (x, y, result))
     print()
-
 
     print("Instantiate the exponential group")
     j = exponential_group(h)
