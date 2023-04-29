@@ -1,5 +1,3 @@
-from itertools import product
-from math import fabs
 import array
 
 class incremental_set:
@@ -34,10 +32,10 @@ class incremental_set:
         assert type(direction) is bool, "direction must be type bool (got %s)" % type(direction)
         self.direction = direction
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.members)
         
-    def __next__(self):
+    def __next__(self) -> int:
         if self.direction:
             if self.index == (len(self)-1):
                 self.index = 0
@@ -53,7 +51,7 @@ class incremental_set:
     def __iter__(self):
         return self
 
-    def __call__(self, repeat):
+    def __call__(self, repeat) -> int:
         if repeat > 0:
             self.set_direction(True)
             [next(self) for i in range(repeat)]
@@ -87,10 +85,10 @@ class group:
     def __len__(self) -> int:
         return len(self.members)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         return self.__dict__ == other.__dict__
 
-    def isBijective(self):
+    def isBijective(self) -> bool:
         return sum([self.inverse.count(each) for each in self.inverse]) == len(self.inverse) and None not in self.inverse
 
     def reset(self, member):
@@ -116,7 +114,7 @@ class additive_group(group):
         assert result is not None, "Inverse for %s does not exist in %s" % (member, self.__class__.__name__)
         return result
 
-    def __call__(self, repeat):
+    def __call__(self, repeat) -> int:
         if repeat > self.identity:
             args = [self.generator] * repeat
             self.generator =  self.synthesize(*args)
@@ -142,7 +140,28 @@ class multiplicative_group(additive_group):
         self.subop.reset(self.identity)
         return [self.subop(repeat=member) for member in members][-1]
 
-
+    def invert(self, member) -> int:
+        '''Find the multiplicative inverse of member
+        using the Extended Euclidean algorithm'''
+        assert member in self.members, "%s not in %s" % (member, self.members)
+        assert member != 0, "0 has no multiplicative inverse"
+        if member < 0:
+            a = -member
+            negate_result = True
+        else:
+            a = member
+            negate_result = False
+        t, newt = 0, 1
+        r, newr = len(self), a
+        while newr != 0:
+            quotient = r // newr
+            (t, newt) = (newt, t - quotient * newt)
+            (r, newr) = (newr, r - quotient * newr)
+        assert r == 1 or r == -1, "%s is not invertible" % member
+        if negate_result:
+            return -t
+        else:
+            return t
 
     
 # some groups are pre-defined for convenience    
@@ -174,16 +193,6 @@ if __name__ == '__main__':
     print("g.synthesize(-2,-2)=", g.synthesize(-2,-2))
     print()
 
-    print("Testing the 5-ary +ve group synthesis for all the combinations (of 2):")
-    for x, y in product(g, repeat=2):
-        print("%s + %s = %s" % (x, y, g.synthesize(x,y)))
-    print()
-
-    print("Testing the 5-ary +ve group analysis for all the combinations (of 2):")
-    for x, y in product(g, repeat=2):
-        print("%s - %s = %s" % (x, y, g.synthesize(x, g.invert(y))))
-    print()
-
     print("Instantiate the multiplicative group")
     h = multiplicative_group(g)
     print("h=",h)
@@ -193,33 +202,21 @@ if __name__ == '__main__':
     print("h.synthesize(-2,2)=", h.synthesize(-2,2))
     print("h.synthesize(2,-2)=", h.synthesize(2,-2))
     print("h.synthesize(-2,-2)=", h.synthesize(-2,-2))
-
-    print("Testing the 5-ary *ve group synthesis for all the combinations (of 2):")
-    for x, y in product(h, repeat=2):
-        print("%s * %s = %s" % (x, y, h.synthesize(x,y)))
+    print()
+    
+    print("h.invert(2)=", h.invert(2))
+    print("h.invert(-2)=", h.invert(-2))
+    print("h.invert(1)=", h.invert(1))
+    print("h.invert(-1)=", h.invert(-1))
+    print()
+    
+    h.reset(2)
+    result = h(2)
+    print('2 squared, or 2 to the power 2, or 2 ** 2, or 2 ^ 2 = ', result)
     print()
 
     assert False, "stop here"
 
-    print("Testing the 5-ary *ve group analysis for all the combinations (of 2):")
-    for x, y in product(h, repeat=2):
-        try:
-            result = h.synthesize(x, h.invert(y))
-        except AssertionError:
-            print("*** Correctly asserted no *ve inverse for %s, skipping..." % y)
-            continue
-        print("%s / %s = %s" % (x, y, result))
-    print()
-
-    print("Instantiate the exponential group")
-    j = exponential_group(h)
-    print("j=",j)
-    print()
-
-    j.set_generator(2)
-    result = j.synthesize(2)
-    print('2 squared, or 2 to the power 2, or 2 ** 2, or 2 ^ 2 = ', result)
-    print()
 
     result = j.analyze(-1)
     print('log2(-1) = ', result)
