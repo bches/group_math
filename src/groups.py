@@ -103,7 +103,9 @@ class additive_group(group):
         self.identity = 0
         self.inverse = self.members[:]
         self.inverse.reverse()
-        
+        if self.members[0] >= 0:
+            self.inverse = array.array("i", [self.inverse[-1]] + list(self.inverse[:-1]))
+            
     def synthesize(self, *members) -> int:
         self.subop.reset(self.identity)
         z = [self.subop(repeat=member) for member in members]
@@ -215,8 +217,21 @@ if __name__ == '__main__':
     print('2 squared, or 2 to the power 2, or 2 ** 2, or 2 ^ 2 = ', result)
     print()
 
-    assert False, "stop here"
 
+    a = additive_group(incremental_set(0,6))
+    print("a=",a)
+    print("5 - 2 =", a.synthesize(5, a.invert(2)))
+    print()
+    a2 = additive_group(incremental_set(-3,3))
+    print("a2=",a2)
+    print("-3 - 2 =", a.synthesize(-3, a.invert(2)))
+    print()
+    a3 = additive_group(incremental_set(1,7))
+    print("a3=",a3)
+    print("5 - 1 =", a.synthesize(5, a.invert(1)))
+    print()
+
+    assert False, "stop here"
 
     result = j.analyze(-1)
     print('log2(-1) = ', result)
