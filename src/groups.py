@@ -136,12 +136,18 @@ class multiplicative_group(additive_group):
         self.identity = 1
         self.inverse = [None] * len(self)
 
+    def __call__(self, repeat) -> int:
+        if repeat == 0:
+            return self.identity
+        else:
+            return additive_group.__call__(self, repeat)
+        
     def synthesize(self, *members) -> int:
         if self.subop.identity in members:
             return self.subop.identity
         self.subop.reset(self.identity)
         return [self.subop(repeat=member) for member in members][-1]
-
+              
     def invert(self, member) -> int:
         '''Find the multiplicative inverse of member
         using the Extended Euclidean algorithm'''
@@ -164,7 +170,7 @@ class multiplicative_group(additive_group):
             return -t
         else:
             return t
-
+        
     
 # some groups are pre-defined for convenience    
 binary_group = {'mul':multiplicative_group(additive_group(incremental_set(0,1))),
@@ -231,6 +237,10 @@ if __name__ == '__main__':
     print("5 - 1 =", a.synthesize(5, a.invert(1)))
     print()
 
+    print("exponentiation:")
+    a.reset(2)
+    result = a(0)
+    print("2 ** 0 =", result) 
     assert False, "stop here"
 
     result = j.analyze(-1)
