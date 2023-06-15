@@ -23,7 +23,7 @@ class space:
         return s
 
     def __getitem__(self, i):
-        return self.vectors[i]
+        return type(self)(self.grp, self.vectors[i])
     
     def __add__(self, other):
         '''Point-wise vector addition'''
@@ -33,7 +33,7 @@ class space:
         result = []
         N = len(self)
         for i in range(N):
-            u, v = self[i], other[i]
+            u, v = self.vectors[i], other.vectors[i]
             assert len(u) == len(v), "vectors must be the same length to add"
             M = len(u)
             if self.grp is not None:
@@ -50,7 +50,7 @@ class space:
         result = []
         N = len(self)
         for i in range(N):
-            u, v = self[i], other[i]
+            u, v = self.vectors[i], other.vectors[i]
             assert len(u) == len(v), "vectors must be the same length to mul"
             M = len(u)
             if self.grp is not None:
@@ -75,17 +75,18 @@ class rowspace(space):
         N = len(self)
         grp = self.grp
         for i in range(N):
-            u, v = self[i], other[i]
-            assert len(u) == len(v), "vectors must be the same length to dot"
-            M = len(u)
-            print("u[i]*v[i]=",u[i]*v[i])
-            #if self.grp is not None:
-                #result += [array("I", [self.grp["mul"].synthesize(u[j], v[j]) for j in range(M)])]
-           # else:
-                #result += [array("I", [u[j] * v[j] for j in range(M)])]
+            row = []
+            for j in range(N):
+                u, v = self[i], other[j].transpose()
+                assert len(u) == len(v), "vectors must be the same length to dot"
+                M = len(u)
+                if self.grp is not None:
+                    row += [ self.grp["add"].synthesize( *(u*v).vectors[0].tolist() ) ]
+                else:
+                    row += [ u*v ]
+            result += [array("I", row)]
         return type(other)(self.grp, *result)
-            
-        
+                    
     
 class colspace(space):
     def get_cols(self):
