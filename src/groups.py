@@ -172,9 +172,10 @@ class multiplicative_group(additive_group):
             return t
         
     
-# some groups are pre-defined for convenience    
-binary_group = {'mul':multiplicative_group(additive_group(incremental_set(0,1))),
-                'add':additive_group(incremental_set(0,1))}
+# some groups are pre-defined for convenience
+bin_add_grp = additive_group(incremental_set(0,1))
+binary_group = {'mul':multiplicative_group(bin_add_grp),
+                'add':bin_add_grp}
 
 
 if __name__ == '__main__':
